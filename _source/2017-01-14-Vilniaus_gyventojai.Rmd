@@ -6,23 +6,6 @@ htmlwidgets: TRUE
 layout: post
 ---
 
-<STYLE TYPE="text/css">
-<!--
-  td{
-    font-size: 10pt;
-  }
-  th {
-    font-size: 10pt;
-    height: 20px;
-    font-weight: bold;
-    text-align: right;
-  }
-  table {
-    padding: 10px;
-  }
---->
-</STYLE>
-
 ```{r setup, include=FALSE, echo=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -79,12 +62,12 @@ Iš viso registruotų gyventojų turime `r people_sum`, o daugiausia gimusių yr
 
 ```{r, message=FALSE, warning=FALSE, results='asis'}
 people %>% 
-group_by(GIMIMO_VALSTYBE) %>% 
-summarise(Viso = n(),
-          Procentas = round(Viso/people_sum*100,1)) %>% 
-arrange(desc(Viso)) %>% 
-head(10) %>% 
-pander(style = 'rmarkdown')
+  group_by(GIMIMO_VALSTYBE) %>% 
+  summarise(Viso = n(),
+            Procentas = round(Viso/people_sum*100,1)) %>% 
+  arrange(desc(Viso)) %>% 
+  head(10) %>% 
+  pander(style = 'rmarkdown')
 ```
 
 ## Gyventojai pagal seniūnijas
