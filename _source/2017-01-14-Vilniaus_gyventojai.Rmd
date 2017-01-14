@@ -1,0 +1,478 @@
+---
+title: Vilniaus gyventojai
+subtitle: Vilniaus gyventojų tankumo žemėlapis
+output: md_document
+htmlwidgets: TRUE
+layout: post
+---
+
+<STYLE TYPE="text/css">
+<!--
+  td{
+    font-size: 10pt;
+  }
+  th {
+    font-size: 10pt;
+    height: 20px;
+    font-weight: bold;
+    text-align: right;
+  }
+  table {
+    padding: 10px;
+  }
+--->
+</STYLE>
+
+```{r setup, include=FALSE, echo=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Vilniaus registruotų gyventojų duomenys
+
+Perskaitęs Povilo Poderskio postą ["Kaip sutaupyti 2.8 milijonus eurų"](https://medium.com/@povilaspoderskis/kaip-sutaupyti-2-8-milijonus-eurų-36363cbdcf46), aplankiau ten minimą Lietuvos atvirų duomenų portalą [www.opendata.lt](http://www.opendata.lt), nes viešai prieinama statistika - visuomet sveikintinas reiškinys. Tuo tarpu mano neatsispirimas pasižaidimams su duomenimis nulėmė tai, jog nutariau panagrinėti patį pirmą įkeltą duomenų pluoštą - Vilniaus miesto savivaldybės registruotų gyventojų sarašą. Kadangi gyvenu Vilniuje ir šis miestas man tikrai patinka, pamaniau, pasirinkimas neturėtų nuvilti. Pagrindinis šio posto klausimas - kur Vilniuje yra tankiausiai gyvenama, o kartu su gautais pastebėjimais pateikiu analizės kelią: keletą duomenų manipuliavimo instrukcijų, komentarų ir galiausiai visą R kodą.
+
+Pirmiausia pakrauname reikalingas bibliotekas, ir, jei dar to nepadarėme, atsisiunčiame  reikalingus duomenis:
+
+```{r, results="hide", message=FALSE, warning=FALSE}
+library(magrittr)
+library(dplyr)
+library(readr)
+library(plotly)
+library(ggplot2)
+library(knitr)
+library(rvest)
+library(stringr)
+library(methods)
+library(pander)
+library(ggmap)
+library(viridis)
+
+Sys.setlocale("LC_ALL", 'Lithuanian')
+
+data_file <- "./data/Vilniaus_gyventojai/registered_people_n_streets.csv"
+
+if (!file.exists(data_file)) {
+  url <- "https://raw.githubusercontent.com/vilnius/gyventojai/master/data/registered_people_n_streets.csv"
+  download.file(url, destfile = data_file)
+}
+
+people <- read_delim("./data/Vilniaus_gyventojai/registered_people_n_streets.csv", delim = ";")
+```
+
+Dabar galime peržvelgti, kokius duomenis nagrinėsime:
+
+```{r, message=FALSE, warning=FALSE, results='asis'}
+# seimos padeties ir vaiku skaičiaus nenagrinėsime
+head(people) %>% 
+  select(-SEIMOS_PADETIS, -KIEK_TURI_VAIKU) %>% 
+  pander(style = 'rmarkdown', split.table = 150)
+```
+
+Paskaičiuojame visą gyventojų kiekį:
+
+```{r}
+# sumuojame visus gyventojus
+people_sum <- nrow(people)
+```
+
+Iš viso registruotų gyventojų turime `r people_sum`, o daugiausia gimusių yra šiose valstybėse:
+
+```{r, message=FALSE, warning=FALSE, results='asis'}
+people %>% 
+group_by(GIMIMO_VALSTYBE) %>% 
+summarise(Viso = n(),
+          Procentas = round(Viso/people_sum*100,1)) %>% 
+arrange(desc(Viso)) %>% 
+head(10) %>% 
+pander(style = 'rmarkdown')
+```
+
+## Gyventojai pagal seniūnijas
+
+Kadangi mūsų tyrinėjamuose duomenyse Vilniaus gyventojai yra suskirstyti pagal seniūnijas, tai pagal jas ir pažvelgsime į gyventojų išsibarstymą.
+
+Pirmiausia - žemėlapis.
+
+![seniūnijų žemėlapis](/img/Vilniaus_gyventojai/VilniausMiestoSeniunijos.png)
+
+Nors seniūnijų plotai smarkiai skiriasi, vis tiek galime pažiūrėti, kurios iš jų yra labiausiai apgyvendintos:
+
+```{r, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+people %>% 
+  filter(SENIUNIJA != "NULL") %>% 
+  group_by(SENIUNIJA) %>% 
+  summarise(Gyventojai = n()) %>% 
+  arrange(desc(Gyventojai)) %>% 
+  mutate(SENIUNIJA = reorder(factor(SENIUNIJA), Gyventojai)) -> sen_people
+
+sen_people %>% 
+  ggplot(aes(x = SENIUNIJA, y = Gyventojai)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Seniūnija") + 
+  theme_minimal() -> sen_people_plot
+
+ggplotly(sen_people_plot)
+```
+
+Norėdami įvertinti tankiausiai apgyvendintas seniūnijas, turime išsitraukti jų plotus. Šią informaciją galime rasti [čia](https://lt.wikipedia.org/wiki/Vilniaus_miesto_savivaldyb%C4%97).
+
+```{r , screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+# nuskaitome lentelę
+"https://lt.wikipedia.org/wiki/Vilniaus_miesto_savivaldyb%C4%97" %>% 
+  read_html() %>% 
+  html_table(fill = TRUE) %>% 
+  .[[7]] -> areas_table
+
+# suvienodiname seniūnijų pavadinimus su prieš tai turėtais
+sen_list <- c("Verkiai", "Antakalnis", "Pašilaičiai", "Fabijoniškės", "Pilaitė",
+              "Justiniškės", "Viršuliškės", "Šeškinė", "Šnipiškės", "Žirmūnai",
+              "Karoliniškės", "Žvėrynas", "Grigiškės", "Lazdynai", "Vilkpėdė",
+              "Naujamiestis", "Senamiestis", "Naujoji  Vilnia", "Paneriai", 
+              "Naujininkai", "Rasos")
+areas_table$SENIUNIJA <- as.factor(sen_list)
+areas_table <- select(areas_table, SENIUNIJA, Plotas)
+
+# sutvarkome plotus
+areas_table$Plotas %>% 
+  str_replace_all("km²", "") %>% 
+  str_trim() %>% 
+  str_replace_all(",", ".") %>% 
+  as.numeric() -> areas_table$Plotas
+
+# sujungiame gyventojų skaičių ir plotų lenteles pagal seniūniją, apskaičiuojame
+# gyventojų tankį, t.y. žmonių skaičių kvadratiniame kilometre
+merge(areas_table, sen_people, by = "SENIUNIJA") %>% 
+  mutate(Tankis = round(Gyventojai / Plotas, 2)) %>% 
+  arrange(desc(Tankis)) %>% 
+  mutate(SENIUNIJA = reorder(factor(SENIUNIJA), Tankis)) -> sen_area_people
+
+sen_area_people %>% 
+  ggplot(aes(x = SENIUNIJA, y = Tankis, 
+             text = paste("Gyventojai:", Gyventojai, "<br>", "Plotas:", Plotas))) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Seniūnija") + 
+  theme_minimal() -> sen_area_people_plot
+
+ggplotly(sen_area_people_plot)
+```
+
+Kaip matome, tankiausiai apgyvendinti yra miegamieji rajonai, o rečiausiai apgyvendintos yra salyginai gerokai didesnį plotą turinčios seniūnijos.
+
+Toliau pažvelkime į žmonių, gimusių kitose valstybėse, procentinį kiekį skirtingose seniūnijose:
+
+```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+people %>% 
+  filter(GIMIMO_VALSTYBE != "LTU",
+         SENIUNIJA != "NULL") %>% 
+  group_by(SENIUNIJA) %>% 
+  summarise(Ne_LTU = n()) %>%
+  left_join(sen_people, by = "SENIUNIJA") %>% 
+  mutate(Ne_LTU_Procentas = 100*Ne_LTU/Gyventojai,
+         SENIUNIJA = reorder(factor(SENIUNIJA), Ne_LTU_Procentas)) %>%
+  ggplot(aes(x = SENIUNIJA, y = Ne_LTU_Procentas)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Seniūnija") + 
+  ylab("Gyventojų, gimusių ne Lietuvoje, procentas") +
+  theme_minimal() -> sen_people_notLTU_plot
+
+ggplotly(sen_people_notLTU_plot)
+```
+
+Galime pastebėti, jog daugiausia iš jų yra apsistoję pietinėse Vilniaus seniūnijose.
+
+## Gyventojai pagal gatves
+
+Nors ir žinome tankiausiai apgyvendintas seniūnijas, jos nėra vientisai apgyvendintos, ypač turinčios didesnį plotą, todėl norėdami tiksliau pamatyti Vilniaus gyventojų koncentraciją patyrinėsime jų skaičius gatvių lygmenyje. Žinoma, ir šis rodiklis nėra idealus, nes gatvių ilgiai smarkiai skiriasi - nuo trumpų senamiesčio gatvelių iki kelis rajonus jungiančių prospektų. Taip pat iškyla problemų norint gyventojų skaičių pavaizduoti žemėlapyje: kaip išdalinti gyventojus per visą gatvės ilgį, kaip įsivertinti tankį iš šalia esančių gatvių ir t.t. Taigi pirmiausia - 15 daugiausiai gyventojų turinčių gatvių:
+
+```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+people %>% 
+  filter(GATVE != "NULL") %>% 
+  group_by(GATVE) %>% 
+  summarise(Gyventoju_gatveje = n()) -> gatves_gyv
+  
+gatves_gyv %>% 
+  top_n(15) %>%
+  mutate(GATVE = reorder(factor(GATVE),Gyventoju_gatveje)) %>% 
+  ggplot(aes(x = GATVE, y = Gyventoju_gatveje)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Gatvė") + 
+  ylab("Gyventojų skaičius") +
+  theme_minimal() -> gatves_gyv_plot
+
+ggplotly(gatves_gyv_plot)
+```
+
+Norėdami panaudoti visą turimą informaciją, ją turime pavaizduoti žemėlapyje, o tam reikės gatvės koordinačių, kurias ištrauksime su **geocode()** iš [ggmap](https://cran.r-project.org/web/packages/ggmap/index.html) paketo. Ši leidžia pasinaudoti Google Maps API ir rasti ieškomo objekto (šiuo atveju - visų turimų gatvių) koordinates. Nenorėdami suerzinti Google, užklausas siųsime vienos sekundės intervalu.
+
+```{r, message=FALSE, warning=FALSE}
+gatves_data_file <- "./data/Vilniaus_gyventojai/gatves_loc_df.csv"
+
+if (!file.exists(gatves_data_file)) {
+  gatves <- gatves_gyv$GATVE
+  gatves_loc <- data.frame(GATVE = gatves, Lon = NA, Lat = NA)
+  gatves_len <- length(gatves)
+  gatves_inc <- 0
+  
+  for (gatve in gatves) {
+    adresas <- paste(gatve, "Vilnius", "Lithuania", sep = ",")
+    tryCatch({
+      geo <- geocode(adresas)
+    }, error = function(e) {
+      print(e)
+      geo$lon <- NA
+      geo$lat <- NA
+      print(paste(adresas, "nerastas!"))
+    })
+    gatves_loc[gatves_loc$GATVE == gatve, "Lon"] <- geo$lon
+    gatves_loc[gatves_loc$GATVE == gatve, "Lat"] <- geo$lat
+    gatves_inc <- gatves_inc + 1
+    print(paste0(round(100*gatves_inc/gatves_len, 1), "% finished"))
+    Sys.sleep(1)
+  }
+  
+  # Pastebime, jog yra gatvių, kurių koordinatės nebuvo rastos. Viena iš priežasčių yra
+  # žmogaus pilnu vardu pavadintos gatvės, o Google Maps vardus dažniausiai sutrumpina,
+  # todėl mėginsime nerastas gatves sutrumpinti iki vieno žodžio ilgio ir pakartoti paieškos
+  # algoritmą.
+
+  gatves_loc %>%
+  filter(is.na(Lon)) %>%
+  .[[1]] -> nerastos_gatves
+
+  lapply(nerastos_gatves, function(gatve) {
+    g_split <- str_split(gatve, pattern = " ") %>% .[[1]]
+    g_zodziai <- length(g_split)
+  
+    if (g_zodziai > 2) {
+      gatve_short <- paste(g_split[(g_zodziai-1):g_zodziai], collapse = " ")
+      adresas_short <- paste(gatve_short, "Vilnius", "Lithuania", sep = ",")
+  
+      tryCatch({
+        geo <- geocode(adresas_short)
+      }, error = function(e) {
+        print(e)
+        geo$lon <- NA
+        geo$lat <- NA
+        print(paste(adresas, "nerastas!"))
+      })
+  
+      gatves_loc[gatves_loc$GATVE == gatve, "Lon"] <<- geo$lon
+      gatves_loc[gatves_loc$GATVE == gatve, "Lat"] <<- geo$lat
+      Sys.sleep(1)
+    }
+    return(NULL)
+  })
+  
+  write.csv(gatves_loc, 
+            file = gatves_data_file,
+            row.names = FALSE)
+}
+
+gatves_loc <- read.csv(gatves_data_file, stringsAsFactors = FALSE)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+print(paste0("Skirtingų gatvių skaičius: ", 
+             nrow(gatves_loc)))
+
+gatves_missing_n <- filter(gatves_loc, is.na(Lon)) %>% nrow()
+print(paste0("Nerasta koordinačių: ", gatves_missing_n, " gatvės"))
+```
+
+Taigi gatvių, kurių koordinatės nebuvo rastos, skaičius yra santykinai mažas, o jose gyvenančių gyventojų yra:
+
+```{r, message=FALSE, warning=FALSE}
+gatves_loc_gyv <- merge(gatves_gyv, gatves_loc, by = "GATVE")
+people_no_loc <- filter(gatves_loc_gyv, is.na(Lon)) %>% 
+                   .[["Gyventoju_gatveje"]] %>% 
+                   sum()
+gatves_loc_gyv <- na.omit(gatves_loc_gyv)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+print(paste0(people_no_loc, 
+             " gyventojai gyvena gatvėse be rastų koordinačių (",
+             round(100*people_no_loc/sum(gatves_gyv$Gyventoju_gatveje), 2),
+             "%)"))
+```
+
+Šie gyventojai yra pašalinami iš duomenų tolimesnėje analizėje įtakos neturės. Pirmiausia pavaizduosime surinktas gatvių koordinates ir jų tankį žemėlapyje. Nereikia pamiršti, jog gatvių kiekis nenusako gyventojų kiekio - tam turėsime nagrinėti kiekvieną registruotą gyventoją atskirai.
+
+```{r, message=FALSE, warning=FALSE}
+map <- get_map(location = 'Vilnius', zoom = 11, maptype = 'roadmap')
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map,extent = "device") +
+  geom_point(aes(x = Lon, y = Lat), 
+             colour = "red", 
+             alpha = 1, 
+             size = 1.5, 
+             data = gatves_loc_gyv) +
+  geom_density2d(aes(x = Lon, y = Lat), 
+                 size = 0.5,
+                 data = gatves_loc_gyv) +
+  stat_density2d(aes(x = Lon, y = Lat, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 7,
+                 geom = "polygon",
+                 data = gatves_loc_gyv) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.15, 0.25), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+## Vilniaus gyventojų tankumo žemėlapis
+
+Kadangi gatvės centrinis taškas reikštų, kad visi gyventojai ten ir gyvena, sugeneruosime dirbtinį žmonių išsibastymą: kiekvienas gyventojas bus paslinktas atstumu iki 425 metrų atsitiktine kryptimi.
+
+```{r}
+people_loc_file <- "./data/Vilniaus_gyventojai/people_loc_df.csv"
+if (!file.exists(people_loc_file)) {
+  people_loc <- merge(people, gatves_loc, by = "GATVE")
+  write.csv(people_loc, people_loc_file, row.names = FALSE)
+}
+people_loc <- read.csv(people_loc_file)
+
+# 0.0046 ilgumos ir 0.0027 platumos pokyčiai, išreikšti dešimtainiais laipsniais, atitinka 300 metrų poslinkį atitinkamomis kryptimis
+people_loc %>% 
+  filter(!is.na(Lon),!is.na(Lat)) %>% 
+  mutate(LonN = Lon + runif(n(), -0.0046, 0.0046),
+         LatN = Lat + runif(n(), -0.0027, 0.0027)) -> people_loc
+```
+
+Pagaliau galime pavaizduoti visų registruotų Vilniaus gyventojų tankumo žemėlapį.
+
+```{r, message=FALSE, warning=FALSE}
+map2 <- get_map(location = 'Vilnius', zoom = 12, maptype = 'roadmap')
+```
+
+```{r, cache = TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map2, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 15,
+                 data = people_loc) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 170,
+                 geom = "polygon",
+                 data = people_loc) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.02, 0.07), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+Rezultatai nėra netikėti. Tankiausiai apgyvendintos miegamųjų rajonų zonos: Justiniškės, Pašilaičiai, Fabijoniškės, Žirmūnai, Lazdynai ir t.t., o senesni Vilniaus rajonai, tokie kaip Senamiestis, Naujamiestis, Užupis ar Naujininkai, yra apgyvendinti rečiau.
+
+## Vilniaus gyventojų, gimusių ne Lietuvoje, tankumo žemėlapis
+
+Galiausiai pažvelgsime į ne Lietuvoje gimusių gyventojų išsibarstymą Vilniuje ir pamėginsime įžvelgti galimas tendencijas. Aptarsime keturias populiariausias valstybes: Balturusiją, Rusiją, Ukrainą ir Jungtinę karalystę.
+
+### Baltarusija
+
+Be standartiškai tankiai apgyvendintų miegamųjų rajonų, gimusieji Baltarusijoje taip pat kaip gyvenamąją vietą dažniau renkasi Naująją Vilnią ir Naujininkus.
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 10,
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "BLR")) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 50,
+                 geom = "polygon",
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "BLR")) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.03, 0.03), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+### Rusija
+
+Tuo tarpu Vilniaus gyventojai, gimę Rusijoje, išsiskiria Naujamiesčio, Lazdynų, Naujosios Vilnios pasirinkimu.
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 10,
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "RUS")) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 50,
+                 geom = "polygon",
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "RUS")) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.03, 0.03), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+### Ukraina
+
+Gimusieji Ukrainoje pasižymi tankiu gyventoju kiekiu Paneriuose ir Naujamiestyje, ypač stoties rajone.
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 10,
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "UKR")) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 50,
+                 geom = "polygon",
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "UKR")) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.03, 0.04), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+### Jungtinė karalystė
+
+O kaip gimimo valstybę Jungtinę karalystę nurodę gyventojai dažniausiai renkasi Pašilaičius ir Fabijoniškes.
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggmap(map, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 10,
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "GBR")) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+                 size = 0.1, 
+                 bins = 70,
+                 geom = "polygon",
+                 data = filter(people_loc,
+                               GIMIMO_VALSTYBE == "GBR")) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.03, 0.03), 
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
+```
+
+## Pabaigai
+
+Norėdami tikslesnio Viniaus gyventojų tankumo žemėlapio turėtume:
+
+- Turėti kiekvieno gyventojo tikslią registruotą gyvenamąją vietą (idealus variantas).
+- Gauti namų, priklausančiu atitinkamoms gatvėms, koordinates ir gatvės gyventojų skaičių išdalinti kiekvienam namui.
+- Išsitraukti tikslias viso ilgio koordinates kiekvienai gatvei ir gyventojus paskirstyti aplink visą gatvės ruožą.
+
+------
