@@ -80,7 +80,7 @@ Pirmiausia - žemėlapis.
 
 Nors seniūnijų plotai smarkiai skiriasi, vis tiek galime pažiūrėti, kurios iš jų yra labiausiai apgyvendintos:
 
-```{r, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+```{r, screenshot.force = FALSE, fig.height=9, fig.cap = ""}
 people %>% 
   filter(SENIUNIJA != "NULL") %>% 
   group_by(SENIUNIJA) %>% 
@@ -100,7 +100,7 @@ ggplotly(sen_people_plot)
 
 Norėdami įvertinti tankiausiai apgyvendintas seniūnijas, turime išsitraukti jų plotus. Šią informaciją galime rasti [čia](https://lt.wikipedia.org/wiki/Vilniaus_miesto_savivaldyb%C4%97).
 
-```{r , screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+```{r , screenshot.force = FALSE, fig.height=9, fig.cap = ""}
 # nuskaitome lentelę
 "https://lt.wikipedia.org/wiki/Vilniaus_miesto_savivaldyb%C4%97" %>% 
   read_html() %>% 
@@ -145,7 +145,7 @@ Kaip matome, tankiausiai apgyvendinti yra miegamieji rajonai, o rečiausiai apgy
 
 Toliau pažvelkime į žmonių, gimusių kitose valstybėse, procentinį kiekį skirtingose seniūnijose:
 
-```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.cap = ""}
 people %>% 
   filter(GIMIMO_VALSTYBE != "LTU",
          SENIUNIJA != "NULL") %>% 
@@ -170,7 +170,7 @@ Galime pastebėti, jog daugiausia iš jų yra apsistoję pietinėse Vilniaus sen
 
 Nors ir žinome tankiausiai apgyvendintas seniūnijas, jos nėra vientisai apgyvendintos, ypač turinčios didesnį plotą, todėl norėdami tiksliau pamatyti Vilniaus gyventojų koncentraciją patyrinėsime jų skaičius gatvių lygmenyje. Žinoma, ir šis rodiklis nėra idealus, nes gatvių ilgiai smarkiai skiriasi - nuo trumpų senamiesčio gatvelių iki kelis rajonus jungiančių prospektų. Taip pat iškyla problemų norint gyventojų skaičių pavaizduoti žemėlapyje: kaip išdalinti gyventojus per visą gatvės ilgį, kaip įsivertinti tankį iš šalia esančių gatvių ir t.t. Taigi pirmiausia - 15 daugiausiai gyventojų turinčių gatvių:
 
-```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.width=10, fig.cap = ""}
+```{r , message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9, fig.cap = ""}
 people %>% 
   filter(GATVE != "NULL") %>% 
   group_by(GATVE) %>% 
@@ -289,7 +289,7 @@ print(paste0(people_no_loc,
 map <- get_map(location = 'Vilnius', zoom = 11, maptype = 'roadmap')
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=9}
 ggmap(map,extent = "device") +
   geom_point(aes(x = Lon, y = Lat), 
              colour = "red", 
@@ -336,20 +336,20 @@ map2 <- get_map(location = 'Vilnius', zoom = 12, maptype = 'roadmap')
 ```
 
 ```{r, cache = TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
-ggmap(map2, extent = "device") +
-  geom_density2d(aes(x = LonN, y = LatN),
-                 size = 0.5,
-                 bins = 15,
-                 data = people_loc) +
-  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
-                 size = 0.1, 
-                 bins = 170,
-                 geom = "polygon",
-                 data = people_loc) +
-  scale_fill_viridis(guide = FALSE) +
-  scale_alpha(range = c(0.02, 0.07), 
-              guide = FALSE) +
-  labs(x = NULL, y = NULL)
+# ggmap(map2, extent = "device") +
+#   geom_density2d(aes(x = LonN, y = LatN),
+#                  size = 0.5,
+#                  bins = 15,
+#                  data = people_loc) +
+#   stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
+#                  size = 0.1, 
+#                  bins = 170,
+#                  geom = "polygon",
+#                  data = people_loc) +
+#   scale_fill_viridis(guide = FALSE) +
+#   scale_alpha(range = c(0.02, 0.07), 
+#               guide = FALSE) +
+#   labs(x = NULL, y = NULL)
 ```
 
 Rezultatai nėra netikėti. Tankiausiai apgyvendintos miegamųjų rajonų zonos: Justiniškės, Pašilaičiai, Fabijoniškės, Žirmūnai, Lazdynai ir t.t., o senesni Vilniaus rajonai, tokie kaip Senamiestis, Naujamiestis, Užupis ar Naujininkai, yra apgyvendinti rečiau.
@@ -358,7 +358,7 @@ Rezultatai nėra netikėti. Tankiausiai apgyvendintos miegamųjų rajonų zonos:
 
 Galiausiai pažvelgsime į ne Lietuvoje gimusių gyventojų išsibarstymą Vilniuje ir pamėginsime įžvelgti galimas tendencijas. Aptarsime keturias populiariausias valstybes: Balturusiją, Rusiją, Ukrainą ir Jungtinę karalystę.
 
-### Baltarusija
+#### Baltarusija
 
 Be standartiškai tankiai apgyvendintų miegamųjų rajonų, gimusieji Baltarusijoje taip pat kaip gyvenamąją vietą dažniau renkasi Naująją Vilnią ir Naujininkus.
 
@@ -381,7 +381,7 @@ ggmap(map, extent = "device") +
   labs(x = NULL, y = NULL)
 ```
 
-### Rusija
+#### Rusija
 
 Tuo tarpu Vilniaus gyventojai, gimę Rusijoje, išsiskiria Naujamiesčio, Lazdynų, Naujosios Vilnios pasirinkimu.
 
@@ -404,7 +404,7 @@ ggmap(map, extent = "device") +
   labs(x = NULL, y = NULL)
 ```
 
-### Ukraina
+#### Ukraina
 
 Gimusieji Ukrainoje pasižymi tankiu gyventoju kiekiu Paneriuose ir Naujamiestyje, ypač stoties rajone.
 
@@ -427,7 +427,7 @@ ggmap(map, extent = "device") +
   labs(x = NULL, y = NULL)
 ```
 
-### Jungtinė karalystė
+#### Jungtinė karalystė
 
 O kaip gimimo valstybę Jungtinę karalystę nurodę gyventojai dažniausiai renkasi Pašilaičius ir Fabijoniškes.
 

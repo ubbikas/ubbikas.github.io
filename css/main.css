@@ -571,6 +571,7 @@ footer .theme-by {
 /* --- Tables --- */
 
 table {
+  font-size: 80%;
   padding: 0;
 }
 table tr {
@@ -646,4 +647,10 @@ td.gutter {
 
 #social-share-section {
   margin-bottom: 30px;
+}
+
+/* --- Custom --- */
+
+.html-widget {
+  width: 100%;
 }
