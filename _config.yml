@@ -122,6 +122,7 @@ exclude:
   - ubbikas.github.io.Rproj
   - .Rproj.user
   - cache
+  - jekyll_command.txt
 
 # prose.io config
 prose:

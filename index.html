@@ -6,9 +6,13 @@ subtitle: Vakariniai pasižaidimai su duomenimis (ir R)
 
 <div class="posts-list">
   {% for post in paginator.posts %}
+  
   <article class="post-preview">
+    
+    <img src="{{ post.image }}" class="thumbnail-image"/>
+
     <a href="{{ post.url | prepend: site.baseurl }}">
-	  <h2 class="post-title">{{ post.title }}</h2>
+	  <h2 class="post-title"> {{ post.title }} </h2>
 
 	  {% if post.subtitle %}
 	  <h3 class="post-subtitle">

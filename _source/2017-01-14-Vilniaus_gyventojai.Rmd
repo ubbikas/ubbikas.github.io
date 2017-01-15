@@ -4,6 +4,7 @@ subtitle: Vilniaus gyventojų tankumo žemėlapis
 output: md_document
 htmlwidgets: TRUE
 layout: post
+image: /img/Vilniaus_gyventojai/thumbnail.png
 ---
 
 ```{r setup, include=FALSE, echo=TRUE}
@@ -289,7 +290,7 @@ print(paste0(people_no_loc,
 map <- get_map(location = 'Vilnius', zoom = 11, maptype = 'roadmap')
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=9}
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
 ggmap(map,extent = "device") +
   geom_point(aes(x = Lon, y = Lat), 
              colour = "red", 
@@ -336,20 +337,20 @@ map2 <- get_map(location = 'Vilnius', zoom = 12, maptype = 'roadmap')
 ```
 
 ```{r, cache = TRUE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
-# ggmap(map2, extent = "device") +
-#   geom_density2d(aes(x = LonN, y = LatN),
-#                  size = 0.5,
-#                  bins = 15,
-#                  data = people_loc) +
-#   stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..), 
-#                  size = 0.1, 
-#                  bins = 170,
-#                  geom = "polygon",
-#                  data = people_loc) +
-#   scale_fill_viridis(guide = FALSE) +
-#   scale_alpha(range = c(0.02, 0.07), 
-#               guide = FALSE) +
-#   labs(x = NULL, y = NULL)
+ggmap(map2, extent = "device") +
+  geom_density2d(aes(x = LonN, y = LatN),
+                 size = 0.5,
+                 bins = 15,
+                 data = people_loc) +
+  stat_density2d(aes(x = LonN, y = LatN, fill = ..level.., alpha = ..level..),
+                 size = 0.1,
+                 bins = 170,
+                 geom = "polygon",
+                 data = people_loc) +
+  scale_fill_viridis(guide = FALSE) +
+  scale_alpha(range = c(0.02, 0.07),
+              guide = FALSE) +
+  labs(x = NULL, y = NULL)
 ```
 
 Rezultatai nėra netikėti. Tankiausiai apgyvendintos miegamųjų rajonų zonos: Justiniškės, Pašilaičiai, Fabijoniškės, Žirmūnai, Lazdynai ir t.t., o senesni Vilniaus rajonai, tokie kaip Senamiestis, Naujamiestis, Užupis ar Naujininkai, yra apgyvendinti rečiau.
