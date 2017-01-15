@@ -663,15 +663,17 @@ td.gutter {
   display: block;
   margin-right: 20px;
   margin-bottom: 20px;
-  
 }
 
 @media only screen and (max-width: 450px) {
   .thumbnail-image {
     float: none;
   }
-
   .post-preview {
     padding: 20px 0px 0px;
   }
+}
+
+.table-overflow {
+  overflow-x: auto;
 }

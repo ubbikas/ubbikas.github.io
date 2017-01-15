@@ -46,10 +46,8 @@ people <- read_delim("./data/Vilniaus_gyventojai/registered_people_n_streets.csv
 Dabar galime peržvelgti, kokius duomenis nagrinėsime:
 
 ```{r, message=FALSE, warning=FALSE, results='asis'}
-# seimos padeties ir vaiku skaičiaus nenagrinėsime
-head(people) %>% 
-  select(-SEIMOS_PADETIS, -KIEK_TURI_VAIKU) %>% 
-  pander(style = 'rmarkdown', split.table = 150)
+head(people) %>%
+  pander(style = 'rmarkdown', split.table = Inf)
 ```
 
 Paskaičiuojame visą gyventojų kiekį:
@@ -357,7 +355,7 @@ Rezultatai nėra netikėti. Tankiausiai apgyvendintos miegamųjų rajonų zonos:
 
 ## Vilniaus gyventojų, gimusių ne Lietuvoje, tankumo žemėlapis
 
-Galiausiai pažvelgsime į ne Lietuvoje gimusių gyventojų išsibarstymą Vilniuje ir pamėginsime įžvelgti galimas tendencijas. Aptarsime keturias populiariausias valstybes: Balturusiją, Rusiją, Ukrainą ir Jungtinę karalystę.
+Galiausiai pažvelgsime į ne Lietuvoje gimusių gyventojų išsibarstymą Vilniuje ir pamėginsime įžvelgti galimas tendencijas. Aptarsime keturias populiariausias valstybes: Balturusiją, Rusiją, Ukrainą ir Jungtinę Karalystę.
 
 #### Baltarusija
 
@@ -428,9 +426,9 @@ ggmap(map, extent = "device") +
   labs(x = NULL, y = NULL)
 ```
 
-#### Jungtinė karalystė
+#### Jungtinė Karalystė
 
-O kaip gimimo valstybę Jungtinę karalystę nurodę gyventojai dažniausiai renkasi Pašilaičius ir Fabijoniškes.
+O kaip gimimo valstybę Jungtinę Karalystę nurodę gyventojai dažniausiai renkasi Pašilaičius ir Fabijoniškes.
 
 ```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
 ggmap(map, extent = "device") +
