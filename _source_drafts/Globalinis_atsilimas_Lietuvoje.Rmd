@@ -1,0 +1,296 @@
+---
+title: Globalinis atšilimas Lietuvoje
+subtitle: Arba kur dingo žiema?
+output: md_document
+htmlwidgets: TRUE
+layout: post
+image: /img/Globalinis_atsilimas_Lietuvoje/thumbnail.png
+---
+
+```{r setup, include=FALSE, echo=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Temperatūros Lietuvoje
+
+```{r, results="hide", message=FALSE, warning=FALSE}
+library(magrittr)
+library(dplyr)
+library(readr)
+library(plotly)
+library(ggplot2)
+library(knitr)
+library(rvest)
+library(tidyr)
+library(stringr)
+library(methods)
+library(pander)
+library(viridis)
+library(gganimate)
+library(tweenr)
+library(purrr)
+library(broom)
+
+Sys.setlocale("LC_ALL", 'Lithuanian')
+
+# TG:daily Mean temperature in 0.1 C
+# Q_TG : quality code for TG (0='valid'; 1='suspect'; 9='missing')
+mean_temperature_file <- "./data/globalinis_atsilimas_Lietuvoje/mean_temperature.txt"
+
+# TN: daily Minimum temperature in 0.1 C
+# Q_TN: quality code for TN (0='valid'; 1='suspect'; 9='missing')
+minimum_temperature_file <- "./data/globalinis_atsilimas_Lietuvoje/minimum_temperature.txt"
+
+# TX: daily Maximum temperature in 0.1 &#176;C
+# Q_TX: quality code for TX (0='valid'; 1='suspect'; 9='missing')
+maximum_temperature_file <- "./data/globalinis_atsilimas_Lietuvoje/maximum_temperature.txt"
+
+# if (!file.exists(data_file)) {
+#   url <- "https://raw.githubusercontent.com/vilnius/gyventojai/master/data/registered_people_n_streets.csv"
+#   download.file(url, destfile = data_file)
+# }
+
+mean_temperature <- read_csv(mean_temperature_file)
+minimum_temperature <- read_csv(minimum_temperature_file)
+maximum_temperature <- read_csv(maximum_temperature_file)
+```
+
+
+```{r}
+mean_temperature %>% 
+  mutate(mean_temp = ifelse(Q_TG %in% c(1, 9),NA, TG/10)) %>% 
+  select(DATE, mean_temp) %>% 
+  filter(DATE >= 19000101) -> mean_temperature
+
+minimum_temperature %>% 
+  mutate(min_temp = ifelse(Q_TN %in% c(1, 9),NA, TN/10)) %>% 
+  select(DATE, min_temp) %>% 
+  filter(DATE >= 19000101) -> minimum_temperature
+
+maximum_temperature %>% 
+  mutate(max_temp = ifelse(Q_TX %in% c(1, 9),NA, TX/10)) %>% 
+  select(DATE, max_temp) %>% 
+  filter(DATE >= 19000101) -> maximum_temperature
+
+bind_cols(mean_temperature, 
+          minimum_temperature["min_temp"],
+          maximum_temperature["max_temp"]) %>% 
+  separate(col = DATE, 
+           into = c("year", "month", "day"),
+           sep = c(4, 6),
+           convert = TRUE) %>% 
+  mutate(season = case_when(.$month %in% c(1, 2, 12) ~ "Žiema",
+                            .$month %in% c(3, 4, 5) ~ "Pavasaris",
+                            .$month %in% c(6, 7, 8) ~ "Vasara",
+                            .$month %in% c(9, 10, 11) ~ "Ruduo") %>% 
+                  factor(levels = c("Pavasaris", "Vasara", "Ruduo", "Žiema"))) -> weather
+
+head(weather)
+```
+
+
+```{r, message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9}
+weather %>% 
+  select(-day,-month) %>% 
+  group_by(year) %>% 
+  summarise_all(mean, na.rm = TRUE) %>% 
+  ggplot(aes(x = year, y = mean_temp)) +
+  geom_point() +
+  geom_smooth(aes(y = max_temp, 
+                  fill = "Maksimali", 
+                  colour = "Maksimali"),
+              span = 0.2) +
+  geom_smooth(aes(fill = "Vidutinė",
+                  colour = "Vidutinė"),
+              span = 0.2) +
+  geom_smooth(aes(y = min_temp, 
+                  fill = "Minimali", 
+                  colour = "Minimali"),
+              span = 0.2) +
+
+  theme_minimal() +
+  scale_fill_manual(name = "", 
+                    values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                    guide = "legend") +
+  scale_colour_manual(name = "", 
+                      values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                      guide = "legend") +
+  xlab("Metai") +
+  ylab("Temperatūra °C") +
+  ggtitle("1900-2016m. temperatūros Lietuvoje") -> yearly_weather_plot
+
+ggplotly(yearly_weather_plot)
+```
+
+
+## Temperatūros skirtingais metų laikais
+
+
+```{r, message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9}
+weather %>% 
+  select(-day) %>% 
+  group_by(year, season) %>% 
+  summarise_all(mean, na.rm = TRUE) %>% 
+  ggplot(aes(x = year, y = mean_temp)) +
+  geom_vline(xintercept = 1980,
+             linetype="dotted",
+             alpha = 0.5) +
+  geom_smooth(aes(y = max_temp, 
+                  fill = "Maksimali", 
+                  colour = "Maksimali"),
+              span = 0.2,
+              se = FALSE) +
+  geom_smooth(aes(fill = "Vidutinė",
+                  colour = "Vidutinė"),
+              span = 0.2,
+              se = FALSE) +
+  geom_smooth(aes(y = min_temp, 
+                  fill = "Minimali", 
+                  colour = "Minimali"),
+              span = 0.2,
+              se = FALSE) +
+
+  theme_minimal() +
+  scale_fill_manual(name = "", 
+                    values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                    guide = "legend") +
+  scale_colour_manual(name = "", 
+                      values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                      guide = "legend") +
+  facet_wrap(~season, nrow = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab(" ") +
+  ylab("Temperatūra °C") +
+  ggtitle("1900-2016m. temperatūros Lietuvoje skirtingais metų laikais") -> season_weather_plot
+
+ggplotly(season_weather_plot)
+```
+
+
+## Temperatūros skirtingais mėnesiais
+
+
+```{r}
+temp_lm <- function(df) {
+  lm(value ~ year, data = df)
+}
+
+weather %>% 
+  filter(year < 1980) %>% 
+  select(-day, -season) %>% 
+  group_by(year, month) %>% 
+  summarise_all(mean, na.rm = TRUE) %>% 
+  gather(key = measurement, value = value, -year, -month) %>% 
+  group_by(month, measurement) %>%
+  nest() %>%
+  mutate(temp_model = map(data, temp_lm)) %>% 
+  mutate(tidy = map(temp_model, tidy)) %>% 
+  unnest(tidy) %>% 
+  filter(term == "year", 
+         p.value < 0.05) %>% 
+  select(month, measurement, estimate, p.value) %>% 
+  mutate(p.value = round(p.value, 4)) %>% 
+  arrange(desc(estimate))
+```
+
+
+```{r}
+weather %>% 
+  filter(year >= 1980) %>% 
+  select(-day, -season) %>% 
+  group_by(year, month) %>% 
+  summarise_all(mean, na.rm = TRUE) %>% 
+  gather(key = measurement, value = value, -year, -month) %>% 
+  group_by(month, measurement) %>%
+  nest() %>%
+  mutate(temp_model = map(data, temp_lm)) %>% 
+  mutate(tidy = map(temp_model, tidy)) %>% 
+  unnest(tidy) %>% 
+  filter(term == "year", 
+         p.value < 0.05) %>% 
+  select(month, measurement, estimate, p.value) %>% 
+  mutate(p.value = round(p.value, 4)) %>% 
+  arrange(desc(estimate))
+```
+
+
+```{r, message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9}
+weather %>% 
+  select(-day, -season) %>% 
+  group_by(year, month) %>% 
+  summarise_all(mean, na.rm = TRUE) %>% 
+  ggplot(aes(x = year, 
+             y = mean_temp)) +
+  geom_vline(xintercept = 1980,
+             linetype="dotted",
+             alpha = 0.5) +
+  geom_smooth(aes(y = max_temp, 
+                  fill = "Maksimali", 
+                  colour = "Maksimali"),
+              se = FALSE,
+              span = 0.3) +
+  geom_smooth(aes(fill = "Vidutinė",
+                  colour = "Vidutinė"),
+              se = FALSE,
+              span = 0.3) +
+  geom_smooth(aes(y = min_temp, 
+                  fill = "Minimali", 
+                  colour = "Minimali"),
+              se = FALSE,
+              span = 0.3) +
+
+  theme_minimal() +
+  scale_fill_manual(name = "", 
+                    values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                    guide = "legend") +
+  scale_colour_manual(name = "", 
+                      values = c("Maksimali" = "red", 
+                               "Vidutinė" = "green",
+                               "Minimali" = "blue"),
+                      guide = "legend") +
+  facet_wrap(~month, nrow = 2) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab(" ") +
+  ylab("Temperatūra °C") +
+  ggtitle("1900-2016m. temperatūros Lietuvoje skirtingais mėnesiais") -> monthly_weather_plot
+
+ggplotly(monthly_weather_plot)
+```
+
+
+```{r, message=FALSE, warning=FALSE, screenshot.force = FALSE, fig.height=9}
+weather %>% 
+  filter(month %in% c(3, 12)) %>% 
+  select(year, month, mean_temp) %>% 
+  group_by(year, month) %>% 
+  summarise(mean_temp = mean(mean_temp, na.rm = TRUE)) %>% 
+  spread(key = month,
+         value = mean_temp,
+         sep = "_") %>% 
+  mutate(differ = month_12 - month_3) %>% 
+  ggplot(aes(x = year,
+             y = differ)) +
+  geom_line(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab(" ") +
+  ylab("Temperatūra °C") +
+  ggtitle("1900-2016m. gruodžio ir kovo temperatūrų skirtumas") -> december_march_plot
+
+ggplotly(december_march_plot)
+```
+
+
